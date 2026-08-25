@@ -1,0 +1,72 @@
+name: Build and Push rtk
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run daily
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/rtk
+  UPSTREAM_REPO: rtk-ai/rtk
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Get latest release version
+        id: get_version
+        run: |
+          LATEST_TAG=$(curl -s https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/latest | jq -r .tag_name)
+          if [ "$LATEST_TAG" = "null" ] || [ -z "$LATEST_TAG" ]; then
+            echo "Failed to get latest tag"
+            exit 1
+          fi
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if image exists
+        id: check_image
+        run: |
+          # Check if this tag already exists on ghcr.io
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.LATEST_TAG }} > /dev/null 2>&1; then
+            echo "Image ${{ env.LATEST_TAG }} already exists. Skipping build."
+            echo "build_needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Image ${{ env.LATEST_TAG }} does not exist. Proceeding with build."
+            echo "build_needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download release asset
+        if: steps.check_image.outputs.build_needed == 'true'
+        run: |
+          # Download the release archive for Linux amd64
+          ASSET_URL="https://github.com/${{ env.UPSTREAM_REPO }}/releases/download/${{ env.LATEST_TAG }}/rtk-x86_64-unknown-linux-musl.tar.gz"
+          curl -L -o rtk.tar.gz "$ASSET_URL"
+
+      - name: Create Dockerfile
+        if: steps.check_image.outputs.build_needed == 'true'
+        run: |
+          # Dynamically generate Dockerfile: use scratch base image and place the downloaded archive in the root directory
+          cat <<EOF > Dockerfile
+          FROM scratch
+          COPY rtk.tar.gz /
+          EOF
+
+      - name: Build and push Docker image
+        if: steps.check_image.outputs.build_needed == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.LATEST_TAG }}
