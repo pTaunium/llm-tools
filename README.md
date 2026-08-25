@@ -38,7 +38,7 @@ If you just want to download and extract the archive to your local Linux machine
 
 ```bash
 # 1. Create a dummy container from the image
-CONTAINER_ID=$(docker create ghcr.io/pTaunium/rtk:v1.0.0)
+CONTAINER_ID=$(docker create ghcr.io/ptaunium/rtk:v1.0.0)
 
 # 2. Copy the archive out to your current directory
 docker cp $CONTAINER_ID:/rtk.tar.gz ./
@@ -58,7 +58,7 @@ If you are building your own Docker image and want to include the tools:
 FROM ubuntu:22.04
 
 # Copy the archive from the data carrier image
-COPY --from=ghcr.io/pTaunium/rtk:v1.0.0 /rtk.tar.gz /tmp/
+COPY --from=ghcr.io/ptaunium/rtk:v1.0.0 /rtk.tar.gz /tmp/
 
 # Extract and install
 RUN tar -xzf /tmp/rtk.tar.gz -C /usr/local/bin/ \
