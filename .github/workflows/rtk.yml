@@ -7,7 +7,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/rtk
   UPSTREAM_REPO: rtk-ai/rtk
 
 jobs:
@@ -18,6 +17,11 @@ jobs:
       packages: write
 
     steps:
+      - name: Set lowercased image name
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=$OWNER/rtk" >> $GITHUB_ENV
+
       - name: Get latest release version
         id: get_version
         run: |
